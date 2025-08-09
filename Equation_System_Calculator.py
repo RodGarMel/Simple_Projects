@@ -15,7 +15,7 @@ Equation_2 = (f"{E2x}x + {E2y}y = {E2a}")
 print(Equation_1)
 print(Equation_2)
 
-#Multiplicar esas madres por su valor en la otra ecuacion empezando por x
+#Multiplicar las variables por su valor en la otra ecuacion empezando por x
 #Checar si x no es el mismo valor en las dos ecuaciones
 #Si no lo es (lo más probable), que se multipliquen a la inversa
 

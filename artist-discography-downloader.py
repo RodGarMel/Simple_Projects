@@ -1,3 +1,4 @@
+import yt_dlp #Our searching/downloading tool
 import time
 import os
 import requests
@@ -64,7 +65,22 @@ def search_albums(artist_id, limit=100):
     data = response.json()
     return data.get("release-groups", [])
 
-artist_name = input("Artist's name:")
+#   Honestly, ChatGPT gave me this next function, I don't really know how to use yt-dlp
+def searchURL(search_term):
+    with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+        info = ydl.extract_info(f"ytsearch1:{search_term}", download=False)
+        
+        # Anti-error validation
+        entries = info.get('entries', [])
+        if not entries:
+            print(f"No se encontraron resultados para: {search_term}")
+            return None
+        
+        video_url = entries[0].get('webpage_url')
+        print("URL encontrada:", video_url)
+        return video_url
+
+artist_name = input("Artist's name: ")
 
 results = search_artist(artist_name)
 # print(results)
@@ -74,6 +90,8 @@ print("Fetching results...")
 time.sleep(.5)
 print("Validating...")
 time.sleep(1)
+
+start = time.time() #Marks the start time when the code executed. This is just for statistics, not part of the main code.
 
 for artist in results:
     lifespan = artist.get('life-span', {})
@@ -132,19 +150,56 @@ for artist in results:
     
     # print(release_ids) #Debugging
 
-    for id in release_ids:
-        songs = search_songs(id[1])
-        album_song_list.append([id[0], songs])
-
-    print(album_song_list) #Debugging 
+    for id in release_ids: #For each id (album)
+        songs = search_songs(id[1]) #Retrieve all the songs of that album
+        album_song_list.append([id[0], songs]) #Store the songs into a list which recieves the values: ([Album Name, [List of songs]])
         
+    download_song_list = [] #Create the list with the names of the songs we're going to download (must have unique values)
+
+    for i in global_list:
+        if i[1] in ["Single"]: # Filter only Singles
+            download_song_list.append(i[0]) #Add the name of the song to the download list
+
+    for album_songs in album_song_list: #For each album existing on the list:
+
+        if isinstance(album_songs[1], list): #Ask if the element we want to add is a list
+            download_song_list.extend(album_songs[1]) #Flat the list because if not, we would store a list into another list, we want only the values inside the list
+        else:
+            download_song_list.append(album_songs[1]) #Store the element directly (Unuseful because, if not always, most of the time is going to be a list)
 
 
 
-    # if album_song_list:
-    #     print(album_song_list)
-    # else:
-    #     print("No se encontraron canciones para el álbum")
+
+    # print("////////////////DEBUGGING////////////////")
+    # print(f"Album Song List: {album_song_list}") #Debugging 
+    # print(f"Global List: {global_list}") #Debugging 
+    # print(f"Download song list total: {download_song_list}") #Debugging 
+
+    download_song_list = list(dict.fromkeys(download_song_list)) #Eliminate duplicated values
+
+    yt_url_list = []
+
+    for song in download_song_list:
+        time.sleep(1)
+        search_term = artist_name+" "+song+" Official Audio"
+        print(f"Buscando {search_term}")
+        yt_url_list.append(searchURL(search_term))
+
+    # print(yt_url_list) # Debugging
+    
+
+    # print(f"Download song list valores únicos: {download_song_list}") #Debugging 
+    # print("////////////////DEBUGGING////////////////")
+
+    #
+    #   From here we start the part in which we need another kind of tools to download the video/audio from youtube.
+    #   We could hardcode it by using an automation tool like Selenium for Chrome but let's use another people's code to simplify
+    #   our lives.
+    #
+
+    end = time.time() #Marks the end time when the code finished executing. This is just for statistics, not part of the main code.
+    
+    print(f"Executing time: {end - start:.2f} segundos")
 
     answer = input("Is this your artist? Type YES or NO \n")
 

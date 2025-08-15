@@ -78,7 +78,7 @@ def searchURL(search_term):
             return None
         
         video_url = entries[0].get('webpage_url')
-        # print("URL encontrada:", video_url)
+        print(f"{search_term}: {video_url}") # Debugging
         return video_url
     
 def download_audio(url, output_folder, song):
@@ -198,15 +198,11 @@ for artist in results:
         else:
             download_song_list.append(album_songs[1]) #Store the element directly (Unuseful because, if not always, most of the time is going to be a list)
 
+    # print(f"download_song_list: {download_song_list}")
 
-
-
-    # print("////////////////DEBUGGING////////////////")
-    # print(f"Album Song List: {album_song_list}") #Debugging 
-    # print(f"Global List: {global_list}") #Debugging 
-    # print(f"Download song list total: {download_song_list}") #Debugging 
 
     download_song_list = list(dict.fromkeys(download_song_list)) #Eliminate duplicated values
+    # print(f"Purgated download_song_list: {download_song_list}") 
 
     yt_url_list = []
     base_folder = os.path.join(get_desktop_path(), "Music")
@@ -216,11 +212,12 @@ for artist in results:
         print(f"Buscando {search_term}")
         yt_url_list.append([song, searchURL(search_term)])
 
-    # print(yt_url_list) # Debugging
+    downloaded_songs = [] #Debugging
 
     # Recorrer canciones y encontrar álbum + URL
     for song in download_song_list:
         # Buscar álbum
+        found = False
         for album, track_list in album_song_list:
             if song in track_list:
                 # Buscar URL de la canción
@@ -229,13 +226,28 @@ for artist in results:
                     print(f"Descargando '{song}' del álbum '{album}'...")
                     output_folder = os.path.join(base_folder, artist_name, album)
                     download_audio(song_url, output_folder, song)
+                    downloaded_songs.append(song) #Debugging
+                    found = True
                 else:
                     print(f"No se encontró URL para '{song}'")
                 break  # Ya encontramos el álbum, no seguir buscando
-    
 
-    # print(f"Download song list valores únicos: {download_song_list}") #Debugging 
-    # print("////////////////DEBUGGING////////////////")
+        # Si no estaba en ningún álbum → va a "Singles"
+        if not found:
+            song_url = next((url for name, url in yt_url_list if name == song), None)
+            if song_url:
+                print(f"Descargando '{song}' como Sencillo...")
+                output_folder = os.path.join(base_folder, artist_name, "Singles")
+                download_audio(song_url, output_folder, song)
+
+        
+    print(f"download_song_list: {download_song_list}") #Debugging
+    print(f"yt_url_list: {yt_url_list}") # Debugging
+    print(f"downloaded_songs: {downloaded_songs}") #Debugging
+    print("Items en download_song_list", len(download_song_list)) # Debugging
+    print("Items en yt_url_list",len(yt_url_list)) # Debugging
+    print("Items en downloaded_songs", len(downloaded_songs)) # Debugging
+    
 
     #
     #   From here we start the part in which we need another kind of tools to download the video/audio from youtube.
@@ -252,12 +264,4 @@ for artist in results:
     if answer == "y":
         print("Congratulations! You've found your artist")
         break
-
-    
-
-
-
-    
-
-
-    
+  

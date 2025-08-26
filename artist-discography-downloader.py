@@ -20,7 +20,7 @@ def search_artist(artist_name):
     data = response.json()
     return data.get("artists", [])
 
-def search_releases(artist_id, album_name, limit=10):
+def search_releases(artist_id, album_name, limit=50):
     time.sleep(1)
     url= "https://musicbrainz.org/ws/2/release/"
     params ={
@@ -31,7 +31,14 @@ def search_releases(artist_id, album_name, limit=10):
     response = requests.get(url, params=params, headers=HEADERS)
     response.raise_for_status()  # Lanza error si la respuesta no es 200
     data = response.json()
-    return data.get("releases", [])
+    releases = data.get("releases", [])
+    releases = [r for r in releases if r.get("status") == "Official"] #Filter only official releases
+    releases = sorted( #We sort the results by track count
+        releases,
+        key=lambda r: r.get("track-count", float('inf')) #Extract the number of tracks from a release or assign as infinite if there's no track count
+    )
+
+    return releases
 
 def search_songs(release_id):
     time.sleep(1)
@@ -148,7 +155,7 @@ for artist in results:
         for album in albums: # For each album existing in the response:
             type = album.get('primary-type')
             if (type in ["Album","EP","Single"]) and (album.get('secondary-types') == []): #Filter only Albums, EPs and Singles
-            # print(f"- Album: {album['title']} ID: {album['id']}")
+                # print(f"- Album: {album['title']} ID: {album['id']}")
                 print(f"- {type}: {album['title']}")
                 global_list.append([album['title'], type]) #Add the name of the release and its type to a global list
     else:
@@ -169,12 +176,20 @@ for artist in results:
         if releases:
             for release in releases:
                 primary_type = release.get("release-group", {}).get("primary-type", "")
-                # track_count = str_to_int(release.get("track-count", ""))
                 track_count = release.get("track-count", "")
-                if (primary_type in ["Album","EP"]) and track_count <=30:
+
+                #Format Type Logic
+                media_list = release.get("media", []) #Media is a list, so first we need to retrieve the list
+                if media_list: 
+                    format_type = media_list[0].get("format", "") #Retrieve the format type from that result
+                else:
+                    format_type = ""
+
+                #Filter by album or ep which is a CD or HDCD and its track count is <30
+                if (primary_type in ["Album","EP"]) and (format_type in ["CD","HDCD", "Digital Media"]) and (track_count <=30):
                     release_id = release.get('id')
-                    release_ids.append([album_name, release_id])
-                    # print(f"ID encontrado para {album_name}: {release_id}") #Debugging 
+                    release_ids.append([album_name, release_id, format_type])
+                    print(f"ID encontrado para {album_name}: {release_id}") #Debugging 
                     break
         else:
             print(f"No se encontró un release_id para: {album_name}")
@@ -201,8 +216,11 @@ for artist in results:
     # print(f"download_song_list: {download_song_list}")
 
 
+    print(len(download_song_list)) #Debugging
     download_song_list = list(dict.fromkeys(download_song_list)) #Eliminate duplicated values
-    # print(f"Purgated download_song_list: {download_song_list}") 
+    # print(f"Purgated download_song_list: {download_song_list}")
+    print(len(download_song_list)) #Debugging
+    breakpoint() #Debugging
 
     yt_url_list = []
     base_folder = os.path.join(get_desktop_path(), "Music")

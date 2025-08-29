@@ -123,6 +123,115 @@ def normalize(string):
     string = "".join(c for c in string if unicodedata.category(c) != "Mn")
     return string.lower().strip()
 
+def search_cover_id(artist_id, album_name, limit=50):
+    time.sleep(1)
+    print("Searching for cover IDs")
+    url= "https://musicbrainz.org/ws/2/release/"
+    params ={
+        "query": f'arid:{artist_id} AND release:"{album_name}"', #Force the search through a query to look for exact coincidences
+        "fmt": "json",
+        "limit": limit
+    }
+    response = requests.get(url, params=params, headers=HEADERS)
+    response.raise_for_status()  #Error if response is not 200
+    data = response.json()
+    releases = data.get("releases", [])
+    releases = [r for r in releases if r.get("status") == "Official"] #Filter only official releases
+    releases = sorted( #We sort the results by date
+        releases,
+        key=lambda r: r.get("date", "9999-99-99")
+    )
+
+    date_list = []
+    items = []
+
+    for release in releases:
+        id = release.get("id")
+        date = release.get("date")
+        country = release.get("country")
+        status = release.get("status")
+        
+        if date and status == "Official":
+            date_list.append(date)
+            items.append([date, country, id])
+
+
+    count = len(items) - 1
+
+    most_recent_date = date_list[count]
+
+    for i in reversed(items):
+        if most_recent_date == i[0] and i[1] == "XW":
+            release_id = i[2]
+            print("Found most recent date for cover art", i)
+            break
+        else:
+            count -= 1
+            if count >= 0:
+                most_recent_date = date_list[count]
+            else:
+                most_recent_date = None 
+                break
+
+    count = len(items) - 1 #Restart count variable
+
+    if not most_recent_date:
+        most_recent_date = date_list[count]
+        for i in reversed(items):
+            if most_recent_date == i[0]:
+                release_id = i[2]
+                print("Found most recent date for cover art", i)
+                break
+            else:
+                count -=1
+                if count >= 0:
+                    most_recent_date = date_list[count]
+                else:
+                    print("No dates found for cover art")
+                    break
+
+    return release_id
+
+def get_cover_art(mbid):
+    url = f"https://coverartarchive.org/release/{mbid}/"
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        #Searches the main image with 'front': True
+        for image in data.get("images", []):
+            if image.get("front", False):
+                return image.get("image")
+
+        #If 'front': False then returns the first image available
+        if data.get("images"):
+            return data["images"][0].get("image")
+
+    except requests.exceptions.RequestException:
+        return None  #Error on petition or there's no cover art
+
+    return None
+
+def download_cover_image(url, output_folder, filename):
+    try:
+        response = requests.get(url, stream=True, timeout=10)
+        response.raise_for_status()  # Lanza excepción si hay error HTTP
+
+        album_folder = output_folder  # carpeta donde quieres guardar
+        os.makedirs(album_folder, exist_ok=True)  # crea la carpeta si no existe
+
+        filename = os.path.join(album_folder, f"{album_name} cover.jpg")
+        
+        # Guardar el contenido en un archivo binario
+        with open(filename, 'wb') as f:
+            for chunk in response.iter_content(1024):
+                f.write(chunk)
+
+        print(f"Imagen descargada correctamente: {filename}")
+    except requests.exceptions.RequestException as e:
+        print("Error al descargar la imagen:", e)
+
 artist_name = input("Artist's name: ")
 
 results = search_artist(artist_name)
@@ -274,6 +383,13 @@ for artist in results:
 
         print("Number of songs to download", len(download_song_list)) # Debugging
         print("Number of downloaded songs", len(downloaded_songs)) # Debugging
+
+        #Where we download cover arts for each album
+        for album_name in album_name_list:
+            cover_id = search_cover_id(artist_id, album_name) #Retrieve a recent cover art
+            cover_image = get_cover_art(cover_id) #Store its URL
+            output_folder = os.path.join(base_folder, artist_name, album_name) #Destination
+            download_cover_image(cover_image, output_folder, album_name) #Download
 
         end = time.time() #Marks the end time when the code finished executing. This is just for statistics, not part of the main code.
         
